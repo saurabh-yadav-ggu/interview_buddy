@@ -1,0 +1,8 @@
+{
+  "name": "AI Interviewer Pro",
+  "description": "A role-based AI interviewer that conducts real-time video interviews, analyzes performance, and generates detailed PDF evaluation reports using Gemini Live API.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
