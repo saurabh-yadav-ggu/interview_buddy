@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality, Type, FunctionDeclaration } from '@google/genai';
 import { CandidateProfile } from '../types';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Activity, Loader2, MessageSquare, X, Code, Play, Terminal, Layout, ChevronUp, ChevronDown, AlertTriangle, Settings, FileCode, CheckCircle2, ClipboardList } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Activity, Loader2, MessageSquare, X, Code, Play, Terminal, Layout, ChevronUp, ChevronDown, AlertTriangle, Settings, FileCode, CheckCircle2, ClipboardList, ShieldAlert } from 'lucide-react';
 import { base64ToUint8Array, arrayBufferToBase64, float32ToInt16, decodeAudioData } from '../utils/audioUtils';
 
 interface LiveInterviewProps {
@@ -254,6 +254,12 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ profile, onEndInterview }
         if(!process.env.API_KEY) {
            throw new Error("API Key is missing. Please check your .env file.");
         }
+
+        // --- SECURITY CHECK ---
+        // getUserMedia requires a Secure Context (HTTPS or localhost).
+        if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+            throw new Error("INSECURE_CONTEXT");
+        }
         
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         
@@ -266,11 +272,24 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ profile, onEndInterview }
             await audioContextRef.current.resume();
         }
         
-        // Setup Media Stream
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            audio: true, 
-            video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 360 } } 
-        });
+        // Setup Media Stream with Specific Error Handling
+        let stream: MediaStream;
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ 
+                audio: true, 
+                video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 360 } } 
+            });
+        } catch (mediaErr: any) {
+            console.error("Media Access Error:", mediaErr);
+            if (mediaErr.name === 'NotAllowedError' || mediaErr.name === 'PermissionDeniedError') {
+                throw new Error("PERMISSION_DENIED");
+            } else if (mediaErr.name === 'NotFoundError') {
+                throw new Error("NO_DEVICES");
+            } else {
+                throw mediaErr;
+            }
+        }
+
         streamRef.current = stream;
         
         if (videoRef.current) {
@@ -560,7 +579,17 @@ Be conversational. Do not be a robot.
       } catch (err: any) {
         console.error("Failed to initialize session", err);
         if (isMounted) {
-            setConnectionError(err.message || "Failed to initialize Gemini Live session.");
+            let userMsg = err.message || "Failed to initialize Gemini Live session.";
+            
+            if (userMsg === "INSECURE_CONTEXT") {
+                userMsg = "SECURE CONNECTION REQUIRED: Browser blocks camera/mic on insecure (HTTP) connections. Use HTTPS or Localhost.";
+            } else if (userMsg === "PERMISSION_DENIED") {
+                userMsg = "PERMISSION DENIED: Please allow Camera & Microphone access in browser settings.";
+            } else if (userMsg === "NO_DEVICES") {
+                userMsg = "HARDWARE MISSING: No camera or microphone found.";
+            }
+
+            setConnectionError(userMsg);
             setIsConnecting(false);
         }
       }
@@ -652,7 +681,10 @@ Be conversational. Do not be a robot.
           {connectionError && (
              <div className="absolute top-4 left-4 right-4 z-50 bg-red-600/95 text-white px-4 py-3 rounded-lg shadow-lg flex items-center justify-between animate-fade-in border border-red-500">
                 <div className="flex items-center flex-1 mr-4">
-                   <AlertTriangle size={20} className="mr-2 flex-shrink-0 text-yellow-300" />
+                   {connectionError.includes("SECURE") || connectionError.includes("PERMISSION") ? 
+                      <ShieldAlert size={20} className="mr-2 flex-shrink-0 text-yellow-300" /> :
+                      <AlertTriangle size={20} className="mr-2 flex-shrink-0 text-yellow-300" />
+                   }
                    <span className="text-xs md:text-sm font-medium">{connectionError}</span>
                 </div>
                 <button onClick={() => window.location.reload()} className="bg-white text-red-600 px-3 py-1 rounded text-xs font-bold uppercase hover:bg-gray-100">Retry</button>

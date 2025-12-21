@@ -18,6 +18,7 @@ const AppContent: React.FC = () => {
   const [report, setReport] = useState<EvaluationReport | null>(null);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
+  const [loadingMessage, setLoadingMessage] = useState<string>("Analyzing interview transcript...");
   
   const { currentUser } = useAuth();
 
@@ -44,6 +45,7 @@ const AppContent: React.FC = () => {
     
     setAppState(AppState.ANALYZING);
     setGenerationError(null);
+    setLoadingMessage("Initializing AI analysis...");
 
     try {
       const apiKey = process.env.API_KEY;
@@ -151,14 +153,52 @@ const AppContent: React.FC = () => {
         IMPORTANT: Return ONLY valid JSON matching the schema.
       `;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: reportSchema
-        }
-      });
+      // Retry Logic with Model Fallback
+      const generateWithRetry = async (retries = 3, delay = 2000): Promise<any> => {
+          try {
+              setLoadingMessage("Generating insights with Gemini Pro...");
+              // Primary Model: Gemini 3 Pro
+              return await ai.models.generateContent({
+                  model: 'gemini-3-pro-preview',
+                  contents: prompt,
+                  config: { responseMimeType: 'application/json', responseSchema: reportSchema }
+              });
+          } catch (e: any) {
+              const isQuotaError = e.message?.includes('429') || e.message?.includes('RESOURCE_EXHAUSTED') || e.message?.includes('Quota exceeded');
+              
+              if (isQuotaError) {
+                  console.warn("Pro model quota exceeded. Switching to Gemini Flash...");
+                  setLoadingMessage("High demand detected. Switching to faster model...");
+                  
+                  try {
+                      // Fallback Model: Gemini 3 Flash
+                      return await ai.models.generateContent({
+                          model: 'gemini-3-flash-preview',
+                          contents: prompt,
+                          config: { responseMimeType: 'application/json', responseSchema: reportSchema }
+                      });
+                  } catch (flashError: any) {
+                       // If Flash also fails, retry if attempts remain
+                       if (retries > 0) {
+                          setLoadingMessage(`Server busy. Retrying in ${delay/1000}s...`);
+                          await new Promise(r => setTimeout(r, delay));
+                          return generateWithRetry(retries - 1, delay * 2);
+                       }
+                       throw flashError;
+                  }
+              }
+
+              // Standard retry for other network errors
+              if (retries > 0) {
+                  setLoadingMessage(`Connection hiccup. Retrying (${retries} attempts left)...`);
+                  await new Promise(r => setTimeout(r, delay));
+                  return generateWithRetry(retries - 1, delay * 2);
+              }
+              throw e;
+          }
+      };
+
+      const response = await generateWithRetry();
       
       let jsonText = response.text;
       
@@ -240,19 +280,29 @@ const AppContent: React.FC = () => {
                 <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
                 <h3 className="text-xl font-bold text-red-700 mb-2">Report Generation Failed</h3>
                 <p className="text-red-600 mb-6 text-sm">{generationError}</p>
-                <button 
-                  onClick={() => setAppState(AppState.SETUP)}
-                  className="bg-white border border-red-200 text-red-700 px-6 py-2 rounded-lg font-semibold hover:bg-red-50 transition"
-                >
-                  Return to Setup
-                </button>
+                <div className="flex space-x-4 justify-center">
+                  <button 
+                    onClick={() => {
+                       if (profile) generateReport("Transcript unavailable due to retry."); // Simple retry action
+                    }}
+                    className="bg-red-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-red-700 transition"
+                  >
+                    Try Again
+                  </button>
+                  <button 
+                    onClick={() => setAppState(AppState.SETUP)}
+                    className="bg-white border border-red-200 text-red-700 px-6 py-2 rounded-lg font-semibold hover:bg-red-50 transition"
+                  >
+                    Return to Setup
+                  </button>
+                </div>
               </div>
             ) : (
               <>
                 <Loader2 className="w-16 h-16 text-blue-600 animate-spin mb-6" />
                 <h2 className="text-2xl font-bold text-gray-800">Generating Performance Report...</h2>
-                <p className="text-gray-500 mt-2 max-w-lg">
-                  Analyzing interview transcript, technical accuracy, and communication skills. This may take 30-60 seconds.
+                <p className="text-gray-500 mt-2 max-w-lg animate-pulse">
+                  {loadingMessage}
                 </p>
               </>
             )}
