@@ -54,15 +54,15 @@ const SetupForm: React.FC<SetupFormProps> = ({ onComplete }) => {
   };
 
   return (
-    <div className="max-w-3xl mx-auto bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">AI Interview Setup</h1>
-        <p className="text-gray-500">Configure your mock interview session with context.</p>
+    <div className="max-w-3xl mx-auto bg-white p-6 md:p-8 rounded-2xl shadow-xl border border-gray-100">
+      <div className="text-center mb-6 md:mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">AI Interview Setup</h1>
+        <p className="text-sm md:text-base text-gray-500">Configure your mock interview session with context.</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-8">
+      <form onSubmit={handleSubmit} className="space-y-6 md:space-y-8">
         {/* Personal Info Section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
               <User size={16} className="mr-2 text-blue-600" /> Candidate Name
@@ -95,13 +95,13 @@ const SetupForm: React.FC<SetupFormProps> = ({ onComplete }) => {
         {/* Experience Level */}
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-3">Experience Level</label>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-2 md:gap-4">
             {['Fresher', 'Intermediate', 'Experienced'].map((level) => (
               <button
                 key={level}
                 type="button"
                 onClick={() => setProfile({ ...profile, experienceLevel: level as any })}
-                className={`py-3 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
+                className={`py-3 px-2 md:px-4 rounded-lg text-xs md:text-sm font-medium transition-all duration-200 ${
                   profile.experienceLevel === level
                     ? 'bg-blue-600 text-white shadow-md transform scale-105'
                     : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'

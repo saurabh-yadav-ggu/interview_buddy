@@ -7,13 +7,32 @@ import HomePage from './components/HomePage';
 import AboutPage from './components/AboutPage';
 import ContactPage from './components/ContactPage';
 import Navbar from './components/Navbar';
+import LoginModal from './components/LoginModal';
 import { AppState, CandidateProfile, EvaluationReport } from './types';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.HOME);
   const [profile, setProfile] = useState<CandidateProfile | null>(null);
   const [report, setReport] = useState<EvaluationReport | null>(null);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+  
+  const { currentUser } = useAuth();
+
+  const handleStartInterviewClick = () => {
+    if (currentUser) {
+      setAppState(AppState.SETUP);
+    } else {
+      setIsLoginModalOpen(true);
+    }
+  };
+
+  const handleLoginSuccess = () => {
+    // Automatically proceed to setup after successful login if that was the intent
+    setAppState(AppState.SETUP);
+  };
 
   const handleSetupComplete = (newProfile: CandidateProfile) => {
     setProfile(newProfile);
@@ -21,12 +40,18 @@ const App: React.FC = () => {
   };
 
   const generateReport = async (transcript: string) => {
-    if (!profile || !process.env.API_KEY) return;
+    if (!profile) return;
     
     setAppState(AppState.ANALYZING);
+    setGenerationError(null);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const apiKey = process.env.API_KEY;
+      if (!apiKey) {
+        throw new Error("API Key is missing. Please ensure 'API_KEY' is set in your .env file or deployment environment variables.");
+      }
+
+      const ai = new GoogleGenAI({ apiKey: apiKey });
 
       // Schema for structured JSON output
       const reportSchema: Schema = {
@@ -105,8 +130,7 @@ const App: React.FC = () => {
         Job Description: ${profile.jobDescription.substring(0, 1000)}...
 
         --- INTERVIEW TRANSCRIPT ---
-        ${transcript.substring(0, 50000)} 
-        (If transcript is empty or too short, infer based on the fact that the candidate participated but maybe had technical audio issues, or simulate a neutral evaluation).
+        ${transcript ? transcript.substring(0, 50000) : "No transcript available. Evaluate based on an assumption of average performance or incomplete session."} 
         ----------------------------
 
         Generate a detailed JSON evaluation report with SCORING OUT OF 100.
@@ -127,7 +151,6 @@ const App: React.FC = () => {
         IMPORTANT: Return ONLY valid JSON matching the schema.
       `;
 
-      // Use Gemini 3 Pro for robust reasoning and JSON generation from complex transcripts
       const response = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
         contents: prompt,
@@ -137,16 +160,32 @@ const App: React.FC = () => {
         }
       });
       
-      const jsonText = response.text || "{}";
-      const reportData = JSON.parse(jsonText) as EvaluationReport;
+      let jsonText = response.text;
       
-      setReport(reportData);
-      setAppState(AppState.REPORT);
+      if (!jsonText) {
+         throw new Error("The AI model returned an empty response. This might be due to safety filters or connection issues.");
+      }
+
+      // Robust Cleaning: Remove Markdown and find JSON object
+      jsonText = jsonText.replace(/```json\s*/g, '').replace(/```\s*$/g, '');
+      const firstBrace = jsonText.indexOf('{');
+      const lastBrace = jsonText.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace !== -1) {
+        jsonText = jsonText.substring(firstBrace, lastBrace + 1);
+      }
+
+      try {
+        const reportData = JSON.parse(jsonText) as EvaluationReport;
+        setReport(reportData);
+        setAppState(AppState.REPORT);
+      } catch (parseError) {
+        console.error("JSON Parse Error:", parseError, "Raw Text:", jsonText);
+        throw new Error("Failed to parse the report data. The AI response was not valid JSON.");
+      }
 
     } catch (error) {
       console.error("Error generating report:", error);
-      alert("Failed to generate report. Please try again.");
-      setAppState(AppState.SETUP); 
+      setGenerationError(error instanceof Error ? error.message : "An unexpected error occurred.");
     }
   };
 
@@ -157,12 +196,18 @@ const App: React.FC = () => {
         onHomeClick={() => setAppState(AppState.HOME)}
         onAboutClick={() => setAppState(AppState.ABOUT)}
         onContactClick={() => setAppState(AppState.CONTACT)}
-        onStartClick={() => setAppState(AppState.SETUP)}
+        onStartClick={handleStartInterviewClick}
+      />
+
+      <LoginModal 
+        isOpen={isLoginModalOpen} 
+        onClose={() => setIsLoginModalOpen(false)}
+        onLoginSuccess={handleLoginSuccess}
       />
 
       <main className="flex-1 relative overflow-hidden flex flex-col">
         {appState === AppState.HOME && (
-          <HomePage onStart={() => setAppState(AppState.SETUP)} />
+          <HomePage onStart={handleStartInterviewClick} />
         )}
         
         {appState === AppState.ABOUT && (
@@ -189,10 +234,28 @@ const App: React.FC = () => {
         )}
 
         {appState === AppState.ANALYZING && (
-          <div className="flex flex-col items-center justify-center h-full bg-white">
-            <Loader2 className="w-16 h-16 text-blue-600 animate-spin mb-6" />
-            <h2 className="text-2xl font-bold text-gray-800">Generating Performance Report...</h2>
-            <p className="text-gray-500 mt-2">Analyzing interview transcript, technical accuracy, and communication skills.</p>
+          <div className="flex flex-col items-center justify-center h-full bg-white px-4 text-center">
+            {generationError ? (
+              <div className="max-w-md bg-red-50 p-6 rounded-2xl border border-red-100 shadow-sm animate-fade-in">
+                <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                <h3 className="text-xl font-bold text-red-700 mb-2">Report Generation Failed</h3>
+                <p className="text-red-600 mb-6 text-sm">{generationError}</p>
+                <button 
+                  onClick={() => setAppState(AppState.SETUP)}
+                  className="bg-white border border-red-200 text-red-700 px-6 py-2 rounded-lg font-semibold hover:bg-red-50 transition"
+                >
+                  Return to Setup
+                </button>
+              </div>
+            ) : (
+              <>
+                <Loader2 className="w-16 h-16 text-blue-600 animate-spin mb-6" />
+                <h2 className="text-2xl font-bold text-gray-800">Generating Performance Report...</h2>
+                <p className="text-gray-500 mt-2 max-w-lg">
+                  Analyzing interview transcript, technical accuracy, and communication skills. This may take 30-60 seconds.
+                </p>
+              </>
+            )}
           </div>
         )}
 
@@ -208,6 +271,14 @@ const App: React.FC = () => {
         )}
       </main>
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 };
 

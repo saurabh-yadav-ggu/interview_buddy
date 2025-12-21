@@ -1,8 +1,8 @@
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Initialize the worker. 
-// Using the ESM build from the same CDN version as the main library.
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://esm.sh/pdfjs-dist@4.0.379/build/pdf.worker.min.mjs`;
+// Match version with import map in index.html (5.4.449)
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://esm.sh/pdfjs-dist@5.4.449/build/pdf.worker.min.mjs`;
 
 export async function extractTextFromPDF(file: File): Promise<string> {
   try {
