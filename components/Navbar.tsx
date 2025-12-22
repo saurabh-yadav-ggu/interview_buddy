@@ -18,6 +18,12 @@ const Navbar: React.FC<NavbarProps> = ({ onHomeClick, onAboutClick, onContactCli
     setIsMobileMenuOpen(false);
   };
 
+  const handleLogout = async () => {
+    await logout();
+    onHomeClick(); // Redirects to Home page by updating app state in parent
+    setIsMobileMenuOpen(false);
+  };
+
   return (
     <header className="bg-white/90 backdrop-blur-sm border-b border-blue-100 sticky top-0 z-50 flex-none h-16 md:h-20 flex items-center">
       <div className="container mx-auto px-4 md:px-6 flex justify-between items-center w-full">
@@ -39,8 +45,8 @@ const Navbar: React.FC<NavbarProps> = ({ onHomeClick, onAboutClick, onContactCli
         {/* Desktop Auth Buttons */}
         <div className="hidden md:flex items-center space-x-4">
           {currentUser ? (
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-4 bg-gray-50 px-4 py-2 rounded-full border border-gray-100">
+              <div className="flex items-center space-x-3">
                 {currentUser.photoURL ? (
                   <img src={currentUser.photoURL} alt="Profile" className="w-8 h-8 rounded-full border border-gray-200" />
                 ) : (
@@ -48,31 +54,40 @@ const Navbar: React.FC<NavbarProps> = ({ onHomeClick, onAboutClick, onContactCli
                     <User size={16} />
                   </div>
                 )}
-                <span className="text-sm font-medium text-gray-700 hidden lg:inline">{currentUser.displayName || currentUser.email}</span>
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-gray-900 leading-none">
+                    {currentUser.displayName || "User"}
+                  </span>
+                  <span className="text-xs text-gray-500 leading-none mt-1">
+                    {currentUser.email}
+                  </span>
+                </div>
               </div>
+              <div className="h-6 w-px bg-gray-300 mx-2"></div>
               <button 
-                onClick={logout}
-                className="text-gray-500 hover:text-red-600 transition p-2"
+                onClick={handleLogout}
+                className="text-gray-500 hover:text-red-600 transition flex items-center space-x-1"
                 title="Sign Out"
               >
-                <LogOut size={20} />
+                <LogOut size={18} />
               </button>
             </div>
           ) : (
-            <button 
-              onClick={onStartClick}
-              className="text-sm font-medium text-blue-700 hover:underline mr-2"
-            >
-              Log In
-            </button>
+            <div className="flex items-center space-x-4">
+              <button 
+                onClick={onStartClick}
+                className="text-sm font-medium text-blue-700 hover:underline"
+              >
+                Log In
+              </button>
+              <button 
+                onClick={onStartClick}
+                className="bg-blue-700 hover:bg-blue-800 text-white px-6 py-2.5 rounded-full font-semibold transition shadow-md hover:shadow-xl transform hover:-translate-y-0.5 text-sm"
+              >
+                Start Live Interview
+              </button>
+            </div>
           )}
-
-          <button 
-            onClick={onStartClick}
-            className="bg-blue-700 hover:bg-blue-800 text-white px-6 py-2.5 rounded-full font-semibold transition shadow-md hover:shadow-xl transform hover:-translate-y-0.5 text-sm"
-          >
-            Start Live Interview
-          </button>
         </div>
 
         {/* Mobile Menu Toggle */}
@@ -92,17 +107,26 @@ const Navbar: React.FC<NavbarProps> = ({ onHomeClick, onAboutClick, onContactCli
           <div className="border-t border-gray-100 pt-4">
              {currentUser ? (
                 <div className="flex flex-col space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <User size={16} className="text-blue-600" />
-                    <span className="text-sm font-medium text-gray-700">{currentUser.displayName || currentUser.email}</span>
+                  <div className="flex items-center space-x-3 p-2 bg-gray-50 rounded-lg">
+                    {currentUser.photoURL ? (
+                      <img src={currentUser.photoURL} alt="Profile" className="w-8 h-8 rounded-full" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                        <User size={16} />
+                      </div>
+                    )}
+                    <div className="flex flex-col">
+                        <span className="text-sm font-bold text-gray-900">{currentUser.displayName || "User"}</span>
+                        <span className="text-xs text-gray-500">{currentUser.email}</span>
+                    </div>
                   </div>
-                  <button onClick={() => handleMobileNav(logout)} className="flex items-center text-red-600 text-sm font-medium">
+                  <button onClick={handleLogout} className="flex items-center text-red-600 text-sm font-medium p-2 hover:bg-red-50 rounded-lg transition">
                     <LogOut size={16} className="mr-2" /> Sign Out
                   </button>
                 </div>
              ) : (
                 <div className="flex flex-col space-y-3">
-                  <button onClick={() => handleMobileNav(onStartClick)} className="text-blue-700 font-medium text-left">Log In</button>
+                  <button onClick={() => handleMobileNav(onStartClick)} className="text-blue-700 font-medium text-left p-2">Log In</button>
                   <button onClick={() => handleMobileNav(onStartClick)} className="bg-blue-700 text-white py-3 rounded-lg font-bold text-center">Start Live Interview</button>
                 </div>
              )}

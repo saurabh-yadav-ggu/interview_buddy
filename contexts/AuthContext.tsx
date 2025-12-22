@@ -1,12 +1,22 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { auth } from '../firebase';
-import { onAuthStateChanged, User, signOut } from 'firebase/auth';
+import { auth, db } from '../firebase';
+import { 
+  onAuthStateChanged, 
+  User, 
+  signOut, 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword,
+  updateProfile
+} from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 
 interface AuthContextType {
   currentUser: User | null;
   loading: boolean;
   logout: () => Promise<void>;
   loginAsGuest: () => void;
+  registerWithEmail: (email: string, password: string, name: string) => Promise<void>;
+  loginWithEmail: (email: string, password: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,19 +34,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      // Only set user if we haven't manually set a guest user (who has no uid in firebase terms)
-      // Actually, onAuthStateChanged will return null on init if not logged in.
-      // If we are "guest", we manage state locally. 
-      // However, if onAuthStateChanged fires (e.g. login elsewhere), it might override.
-      // For simplicity, we let Firebase truth prevail, but if null, we keep guest if set? 
-      // No, simpler: onAuthStateChanged controls the source of truth for Firebase users.
-      // Guest users are local state overrides.
-      
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
+        // When auth state changes, update state.
+        // Note: This fires on login/logout/init, but NOT on updateProfile usually.
         setCurrentUser(user);
       } else {
-        // If firebase says null, we only set null if we aren't currently a guest
+        // Handle guest user persistence or clear state
         setCurrentUser(prev => (prev?.isAnonymous && prev.email === 'guest@example.com' ? prev : null));
       }
       setLoading(false);
@@ -45,13 +49,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return unsubscribe;
   }, []);
 
+  const registerWithEmail = async (email: string, password: string, name: string) => {
+    // 1. Create Auth User
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+
+    // 2. Update Auth Profile (Display Name)
+    try {
+        await updateProfile(user, {
+            displayName: name
+        });
+        
+        // Force a reload to ensure all properties are synced
+        await user.reload();
+    } catch (e) {
+        console.error("Error updating profile", e);
+    }
+
+    // 3. Store User Data in Firestore
+    try {
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        name: name,
+        email: email,
+        createdAt: new Date().toISOString(),
+        role: "user"
+      });
+    } catch (error: any) {
+      if (error.code === 'permission-denied') {
+        console.warn("Firestore write permission denied. User profile saved in Auth only.");
+      } else {
+        console.error("Error writing user document: ", error);
+      }
+    }
+
+    // 4. Force update local state to reflect the new display name immediately.
+    // We create a new object reference and explicitly set displayName because 
+    // spreading a Firebase User object sometimes misses getter properties.
+    const updatedUser = { ...user, displayName: name } as unknown as User;
+    setCurrentUser(updatedUser);
+  };
+
+  const loginWithEmail = async (email: string, password: string) => {
+    await signInWithEmailAndPassword(auth, email, password);
+  };
+
   const logout = async () => {
     await signOut(auth);
     setCurrentUser(null);
   };
 
   const loginAsGuest = () => {
-    // Create a mock user object that satisfies the parts of the User interface we use
     const guestUser = {
       uid: 'guest-' + Math.random().toString(36).substr(2, 9),
       displayName: 'Guest User',
@@ -61,7 +109,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isAnonymous: true,
       metadata: {},
       providerData: [],
-      // Mock methods that might be called (though unlikely in this app's current state)
       delete: async () => {},
       getIdToken: async () => 'mock-token',
       getIdTokenResult: async () => ({} as any),
@@ -78,7 +125,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     currentUser,
     loading,
     logout,
-    loginAsGuest
+    loginAsGuest,
+    registerWithEmail,
+    loginWithEmail
   };
 
   return (

@@ -4,6 +4,7 @@ export interface CandidateProfile {
   experienceLevel: 'Fresher' | 'Intermediate' | 'Experienced';
   resumeText: string;
   jobDescription: string;
+  durationMinutes: number;
 }
 
 export interface EvaluationReport {

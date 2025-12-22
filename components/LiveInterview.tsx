@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality, Type, FunctionDeclaration } from '@google/genai';
 import { CandidateProfile } from '../types';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Activity, Loader2, MessageSquare, X, Code, Play, Terminal, Layout, ChevronUp, ChevronDown, AlertTriangle, Settings, FileCode, CheckCircle2, ClipboardList, ShieldAlert } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Activity, Loader2, MessageSquare, X, Code, Play, Terminal, Layout, ChevronUp, ChevronDown, AlertTriangle, Settings, FileCode, CheckCircle2, ClipboardList, ShieldAlert, Timer } from 'lucide-react';
 import { base64ToUint8Array, arrayBufferToBase64, float32ToInt16, decodeAudioData } from '../utils/audioUtils';
 
 interface LiveInterviewProps {
@@ -44,7 +44,7 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ profile, onEndInterview }
   const [isMicOn, setIsMicOn] = useState(true);
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [volume, setVolume] = useState(0);
-  const [duration, setDuration] = useState(0);
+  const [secondsElapsed, setSecondsElapsed] = useState(0);
   const [isChatOpen, setIsChatOpen] = useState(false); // Desktop drawer toggle
   const [isMobileChatExpanded, setIsMobileChatExpanded] = useState(false); // Mobile expanded view
   const [chatHistory, setChatHistory] = useState<{role: 'user' | 'ai', text: string}[]>([]);
@@ -66,6 +66,7 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ profile, onEndInterview }
   const activeTabRef = useRef(activeTab);
   const codeRef = useRef(code);
   const editorRef = useRef<HTMLTextAreaElement>(null);
+  const interviewEndedRef = useRef(false);
 
   // Refs for Media & Audio
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -105,9 +106,22 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ profile, onEndInterview }
     }
   }, [chatHistory, isChatOpen, isMobileChatExpanded]);
 
-  // Timer
+  // Timer & Auto-End Logic
+  const durationLimitSeconds = profile.durationMinutes * 60;
+  
   useEffect(() => {
-    const timer = setInterval(() => setDuration(prev => prev + 1), 1000);
+    const timer = setInterval(() => {
+      setSecondsElapsed(prev => {
+        const next = prev + 1;
+        
+        // Auto-end interview when time limit is reached
+        if (next >= durationLimitSeconds && !interviewEndedRef.current) {
+           interviewEndedRef.current = true;
+           handleEndCall(); // Trigger exit
+        }
+        return next;
+      });
+    }, 1000);
     return () => clearInterval(timer);
   }, []);
 
@@ -198,11 +212,12 @@ const LiveInterview: React.FC<LiveInterviewProps> = ({ profile, onEndInterview }
 
       // --- SEND RESULT TO LIVE INTERVIEWER ---
       if (isConnectedRef.current && sessionPromiseRef.current) {
-         sessionPromiseRef.current.then(session => {
+         sessionPromiseRef.current.then(async session => {
             // Send the code and output as text to the live model so it can analyze it
             // Note: Sending 'text' via sendRealtimeInput allows the model to "read" the context
             try {
-                session.send({
+                // Using send() for text parts as per updated SDK usage for context injection
+                await session.send({
                     parts: [{
                         text: `[SYSTEM] The candidate executed the code.\n\nCODE:\n${code}\n\nOUTPUT:\n${output}\n\nPlease analyze this output and the code quality. Provide feedback to the candidate.`
                     }]
@@ -363,9 +378,9 @@ Be conversational. Do not be a robot.
 
                           // Acknowledge the tool call
                           if (isConnectedRef.current && sessionPromiseRef.current) {
-                            sessionPromiseRef.current.then(session => {
+                            sessionPromiseRef.current.then(async session => {
                                 try {
-                                    session.sendToolResponse({
+                                    await session.sendToolResponse({
                                         functionResponses: [{
                                             id: call.id,
                                             name: call.name,
@@ -449,12 +464,20 @@ Be conversational. Do not be a robot.
             },
             onerror: (err) => {
               console.error("Session Error", err);
-              isConnectedRef.current = false;
+              // Only report error if session was supposed to be active or connecting
               if (isMounted) {
                  const errorMessage = err instanceof Error ? err.message : String(err);
-                 if (errorMessage.includes("Network error") || errorMessage.includes("Failed to fetch")) {
-                     setConnectionError("Network Error: Could not connect to Gemini Live. Check internet connection.");
-                 } else if (errorMessage.includes("404") || errorMessage.includes("not found")) {
+                 
+                 // Suppress "Network error" if it happens during teardown or initial handshake
+                 // (Common in React Strict Mode double-mounts or socket closing)
+                 if (errorMessage.toLowerCase().includes("network error")) {
+                     console.warn("Ignored transient network error.");
+                     return; 
+                 }
+
+                 isConnectedRef.current = false;
+
+                 if (errorMessage.includes("404") || errorMessage.includes("not found")) {
                      setConnectionError("Model unavailable (404). Check API Key region.");
                  } else {
                      setConnectionError(`Connection Error: ${errorMessage}`);
@@ -510,13 +533,16 @@ Be conversational. Do not be a robot.
             const base64Data = arrayBufferToBase64(uint8Data.buffer);
             
             sessionPromise
-                  .then(session => {
+                  .then(async session => {
                       if (isConnectedRef.current) {
                           try {
-                            session.sendRealtimeInput({
+                            await session.sendRealtimeInput({
                               media: { mimeType: 'audio/pcm;rate=16000', data: base64Data }
                             });
-                          } catch(e) { }
+                          } catch(e) {
+                             // Suppress send errors (like network hiccup)
+                             // console.debug("Audio send dropped", e); 
+                          }
                       }
                   })
                   .catch(() => {});
@@ -563,13 +589,15 @@ Be conversational. Do not be a robot.
           const base64Image = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
           
           sessionPromise
-            .then(session => {
+            .then(async session => {
                 if (isConnectedRef.current) {
                     try {
-                        session.sendRealtimeInput({
+                        await session.sendRealtimeInput({
                           media: { mimeType: 'image/jpeg', data: base64Image }
                         });
-                    } catch (e) { }
+                    } catch (e) { 
+                        // Suppress send errors
+                    }
                 }
             })
             .catch(() => {});
@@ -621,14 +649,23 @@ Be conversational. Do not be a robot.
   }, [profile]);
 
   const handleEndCall = () => {
-    onEndInterview(transcriptRef.current || "No transcript available."); 
+    // Only call once
+    if (transcriptRef.current) {
+        onEndInterview(transcriptRef.current);
+    } else {
+        onEndInterview("Session ended with no transcript.");
+    }
   };
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  const formatCountdown = (totalSeconds: number) => {
+     const remaining = Math.max(0, durationLimitSeconds - totalSeconds);
+     const mins = Math.floor(remaining / 60);
+     const secs = remaining % 60;
+     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
+
+  const timeLeft = Math.max(0, durationLimitSeconds - secondsElapsed);
+  const isUrgent = timeLeft < 60; // Less than 1 min left
 
   return (
     <div className="flex flex-col h-[100dvh] bg-slate-900 text-white overflow-hidden">
@@ -658,8 +695,9 @@ Be conversational. Do not be a robot.
         </div>
 
         <div className="flex items-center space-x-2 md:space-x-4">
-          <div className="font-mono bg-slate-800 px-2 md:px-3 py-1 rounded text-xs md:text-sm">
-            {formatTime(duration)}
+          <div className={`font-mono px-3 py-1 rounded text-xs md:text-sm flex items-center transition-colors ${isUrgent ? 'bg-red-900 text-red-100 border border-red-700 animate-pulse' : 'bg-slate-800 text-white'}`}>
+            <Timer size={14} className="mr-2" />
+            {formatCountdown(secondsElapsed)}
           </div>
           {/* Desktop Chat Toggle */}
           <button 
@@ -909,7 +947,7 @@ Be conversational. Do not be a robot.
             </button>
             
             <button 
-              onClick={handleEndCall}
+              onClick={() => handleEndCall()}
               className="px-8 py-4 bg-red-600 hover:bg-red-700 rounded-full font-bold shadow-xl flex items-center space-x-2 text-white transform hover:scale-105 transition-all"
             >
               <PhoneOff size={24} />

@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { CandidateProfile } from '../types';
-import { User, Briefcase, FileText, ArrowRight, Upload, Loader2, AlertCircle } from 'lucide-react';
+import { User, Briefcase, FileText, ArrowRight, Upload, Loader2, AlertCircle, Clock } from 'lucide-react';
 import { extractTextFromPDF } from '../utils/pdfUtils';
 
 interface SetupFormProps {
@@ -13,7 +13,8 @@ const SetupForm: React.FC<SetupFormProps> = ({ onComplete }) => {
     role: '',
     experienceLevel: 'Intermediate',
     resumeText: '',
-    jobDescription: ''
+    jobDescription: '',
+    durationMinutes: 15 // Default duration
   });
   
   const [isProcessingPdf, setIsProcessingPdf] = useState(false);
@@ -92,24 +93,69 @@ const SetupForm: React.FC<SetupFormProps> = ({ onComplete }) => {
           </div>
         </div>
 
-        {/* Experience Level */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-3">Experience Level</label>
-          <div className="grid grid-cols-3 gap-2 md:gap-4">
-            {['Fresher', 'Intermediate', 'Experienced'].map((level) => (
-              <button
-                key={level}
-                type="button"
-                onClick={() => setProfile({ ...profile, experienceLevel: level as any })}
-                className={`py-3 px-2 md:px-4 rounded-lg text-xs md:text-sm font-medium transition-all duration-200 ${
-                  profile.experienceLevel === level
-                    ? 'bg-blue-600 text-white shadow-md transform scale-105'
-                    : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'
-                }`}
-              >
-                {level}
-              </button>
-            ))}
+        {/* Settings Row: Experience & Time */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Experience Level */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-3">Experience Level</label>
+            <div className="flex bg-gray-50 p-1 rounded-lg border border-gray-200">
+              {['Fresher', 'Intermediate', 'Experienced'].map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  onClick={() => setProfile({ ...profile, experienceLevel: level as any })}
+                  className={`flex-1 py-2 rounded-md text-xs font-medium transition-all duration-200 ${
+                    profile.experienceLevel === level
+                      ? 'bg-white text-blue-600 shadow-sm border border-gray-200'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {level}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Time Duration */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center justify-between">
+              <div className="flex items-center">
+                <Clock size={16} className="mr-2 text-blue-600" /> Duration (Minutes)
+              </div>
+            </label>
+            <div className="flex items-center space-x-2">
+              <div className="flex bg-gray-50 p-1 rounded-lg border border-gray-200 flex-1">
+                {[15, 30, 45, 60].map((mins) => (
+                  <button
+                    key={mins}
+                    type="button"
+                    onClick={() => setProfile({ ...profile, durationMinutes: mins })}
+                    className={`flex-1 py-2 rounded-md text-xs font-medium transition-all duration-200 ${
+                      profile.durationMinutes === mins
+                        ? 'bg-white text-blue-600 shadow-sm border border-gray-200'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    {mins}m
+                  </button>
+                ))}
+              </div>
+              <div className="w-24 relative">
+                 <input
+                    type="number"
+                    min="1"
+                    max="180"
+                    value={profile.durationMinutes}
+                    onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        setProfile({ ...profile, durationMinutes: isNaN(val) ? 0 : Math.max(1, val) });
+                    }}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 bg-gray-50 focus:bg-white text-center text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
+                    placeholder="Custom"
+                 />
+                 <span className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 text-xs pointer-events-none">min</span>
+              </div>
+            </div>
           </div>
         </div>
 
