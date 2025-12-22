@@ -129,7 +129,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
             </div>
             <h2 className="text-2xl font-bold text-gray-900">{isSignUp ? 'Create Account' : 'Welcome Back'}</h2>
             <p className="text-gray-500 text-sm mt-1">
-              {isSignUp ? 'Join Interview Buddy today.' : 'Sign in to access your interview history.'}
+              {isSignUp ? 'Join Interview Mate today.' : 'Sign in to access your interview history.'}
             </p>
           </div>
 

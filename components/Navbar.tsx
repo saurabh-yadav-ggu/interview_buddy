@@ -32,7 +32,7 @@ const Navbar: React.FC<NavbarProps> = ({ onHomeClick, onAboutClick, onContactCli
           className="flex items-center space-x-2 text-blue-700 font-bold text-lg md:text-xl tracking-wide cursor-pointer hover:opacity-80 transition"
         >
           <Sparkles className="w-5 h-5 md:w-6 md:h-6" />
-          <span className="uppercase tracking-wider">Interview Buddy</span>
+          <span className="uppercase tracking-wider">Interview Mate</span>
         </div>
         
         {/* Desktop Nav */}

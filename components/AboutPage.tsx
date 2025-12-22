@@ -6,7 +6,7 @@ const AboutPage: React.FC = () => {
     <div className="h-full bg-slate-50 overflow-y-auto">
       {/* Header Section */}
       <div className="bg-blue-900 text-white py-20 px-6 text-center">
-        <h1 className="text-4xl md:text-5xl font-bold mb-6">About Interview Buddy</h1>
+        <h1 className="text-4xl md:text-5xl font-bold mb-6">About Interview Mate</h1>
         <p className="text-xl text-blue-100 max-w-3xl mx-auto">
           Bridging the gap between preparation and performance with AI-driven interview simulations.
         </p>
@@ -16,7 +16,7 @@ const AboutPage: React.FC = () => {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 md:p-12 mb-12">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Our Mission</h2>
           <p className="text-gray-600 leading-relaxed text-lg">
-            Interview Buddy is designed to help job seekers, students, and professionals master technical interviews. 
+            Interview Mate is designed to help job seekers, students, and professionals master technical interviews. 
             By leveraging advanced Generative AI from Google, we provide a realistic, pressure-free environment where you can 
             practice, fail, learn, and improve before the actual interview.
           </p>

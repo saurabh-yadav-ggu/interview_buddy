@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality, Type, FunctionDeclaration } from '@google/genai';
 import { CandidateProfile } from '../types';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Activity, Loader2, MessageSquare, X, Code, Play, Terminal, Layout, ChevronUp, ChevronDown, AlertTriangle, Settings, FileCode, CheckCircle2, ClipboardList, ShieldAlert, Timer } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Activity, Loader2, MessageSquare, X, Code, Play, Terminal, Layout, ChevronUp, ChevronDown, AlertTriangle, Settings, FileCode, CheckCircle2, ClipboardList, ShieldAlert, Timer, Lock } from 'lucide-react';
 import { base64ToUint8Array, arrayBufferToBase64, float32ToInt16, decodeAudioData } from '../utils/audioUtils';
 
 interface LiveInterviewProps {
@@ -667,6 +667,54 @@ Be conversational. Do not be a robot.
   const timeLeft = Math.max(0, durationLimitSeconds - secondsElapsed);
   const isUrgent = timeLeft < 60; // Less than 1 min left
 
+  // --- PERMISSION DENIED UI ---
+  if (connectionError && connectionError.includes("PERMISSION DENIED")) {
+    return (
+      <div className="flex flex-col h-[100dvh] bg-slate-950 text-white items-center justify-center p-6 text-center animate-fade-in relative overflow-hidden">
+         {/* Background decoration */}
+         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500 via-yellow-500 to-blue-500"></div>
+         
+         <div className="relative z-10 max-w-lg w-full bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl">
+            <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mb-6 mx-auto">
+                <Video size={40} className="text-red-500" />
+            </div>
+            
+            <h2 className="text-2xl md:text-3xl font-bold mb-3">Permission Access Needed</h2>
+            <p className="text-slate-400 mb-8 leading-relaxed">
+                Browser access to your camera and microphone was blocked. The AI interviewer requires these to interact with you.
+            </p>
+            
+            <div className="bg-slate-950/50 p-5 rounded-xl text-left border border-slate-800/50 mb-8">
+                <h3 className="font-semibold mb-4 flex items-center text-blue-400 text-sm uppercase tracking-wider">
+                    <Settings size={14} className="mr-2"/> Enable Access to Continue
+                </h3>
+                <ol className="space-y-4 text-sm text-slate-300">
+                    <li className="flex items-start">
+                        <span className="bg-slate-800 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold mr-3 shrink-0">1</span>
+                        <span>Click the <Lock size={14} className="inline mx-1 text-yellow-500" /> <strong>Lock Icon</strong> in your browser's address bar (top left).</span>
+                    </li>
+                    <li className="flex items-start">
+                        <span className="bg-slate-800 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold mr-3 shrink-0">2</span>
+                        <span>Set <strong>Camera</strong> & <strong>Microphone</strong> to <span className="text-green-400 font-bold bg-green-400/10 px-1.5 py-0.5 rounded">Allow</span>.</span>
+                    </li>
+                    <li className="flex items-start">
+                        <span className="bg-slate-800 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold mr-3 shrink-0">3</span>
+                        <span>Refresh the page.</span>
+                    </li>
+                </ol>
+            </div>
+
+            <button 
+                onClick={() => window.location.reload()} 
+                className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-blue-500/20 flex items-center justify-center"
+            >
+                <Activity size={20} className="mr-2" /> Reload Page
+            </button>
+         </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-[100dvh] bg-slate-900 text-white overflow-hidden">
       {/* Header */}
@@ -715,11 +763,11 @@ Be conversational. Do not be a robot.
         {/* Center Stage (Video OR Code) */}
         <div className="flex-1 flex flex-col relative transition-all duration-300 w-full bg-black">
           
-          {/* Error Banner */}
-          {connectionError && (
+          {/* Error Banner (For non-permission errors) */}
+          {connectionError && !connectionError.includes("PERMISSION DENIED") && (
              <div className="absolute top-4 left-4 right-4 z-50 bg-red-600/95 text-white px-4 py-3 rounded-lg shadow-lg flex items-center justify-between animate-fade-in border border-red-500">
                 <div className="flex items-center flex-1 mr-4">
-                   {connectionError.includes("SECURE") || connectionError.includes("PERMISSION") ? 
+                   {connectionError.includes("SECURE") ? 
                       <ShieldAlert size={20} className="mr-2 flex-shrink-0 text-yellow-300" /> :
                       <AlertTriangle size={20} className="mr-2 flex-shrink-0 text-yellow-300" />
                    }

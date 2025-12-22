@@ -36,7 +36,7 @@ const ContactPage: React.FC = () => {
           </div>
 
           <div className="mt-12">
-            <p className="text-sm text-blue-400">© Interview Buddy Support</p>
+            <p className="text-sm text-blue-400">© Interview Mate Support</p>
           </div>
         </div>
 

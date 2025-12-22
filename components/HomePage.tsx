@@ -36,7 +36,7 @@ const HomePage: React.FC<HomePageProps> = ({ onStart }) => {
       {/* Features Section */}
       <section className="bg-white py-16 md:py-24 px-4 md:px-6 border-t border-blue-50">
         <div className="container mx-auto max-w-6xl">
-          <h2 className="text-2xl md:text-4xl font-bold text-center text-blue-900 mb-10 md:mb-16">Why Interview Buddy?</h2>
+          <h2 className="text-2xl md:text-4xl font-bold text-center text-blue-900 mb-10 md:mb-16">Why Interview Mate?</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10">
             {/* Card 1 */}
@@ -78,9 +78,9 @@ const HomePage: React.FC<HomePageProps> = ({ onStart }) => {
       {/* Simple Footer */}
       <footer className="bg-slate-50 py-8 md:py-12 text-center text-gray-500 text-sm border-t border-gray-200 px-4">
         <div className="mb-4">
-          <span className="font-bold text-blue-900 text-lg">INTERVIEW BUDDY</span>
+          <span className="font-bold text-blue-900 text-lg">INTERVIEW MATE</span>
         </div>
-        <p>© {new Date().getFullYear()} Interview Buddy. Powered by Google Gemini.</p>
+        <p>© {new Date().getFullYear()} Interview Mate. Powered by Google Gemini.</p>
       </footer>
     </div>
   );
